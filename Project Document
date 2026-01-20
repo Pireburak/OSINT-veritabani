@@ -1,0 +1,258 @@
+Harika, sunduğun **Pentest Kontrol Paneli** dokümantasyonunu baz alarak, bunu tamamen **OSINT (Açık Kaynak İstihbaratı)** süreçlerine uyarladım.
+
+Bu versiyonda; "saldırı" ve "zafiyet tarama" araçlarının yerini "bilgi toplama", "dijital ayak izi çıkarma" ve "varlık tespiti" araçları almıştır. Ayrıca yasal uyarılar, sistem güvenliğinden ziyade **veri gizliliği (GDPR/KVKK)** üzerine odaklanmıştır.
+
+İşte **OSINT Operasyon Kontrol Paneli (OOCP)** için kapsamlı dokümantasyon:
+
+---
+
+# **OSINT Operations Control Panel (OOCP) - Kapsamlı Dokümantasyon**
+
+### **İçindekiler**
+
+1. [Proje Genel Bakış](https://www.google.com/search?q=%231-proje-genel-bak%C4%B1%C5%9F)
+2. [Sistem Mimarisi ve Teknik Tasarım](https://www.google.com/search?q=%232-sistem-mimarisi-ve-teknik-tasar%C4%B1m)
+3. [Araç Entegrasyonları](https://www.google.com/search?q=%233-ara%C3%A7-entegrasyonlar%C4%B1)
+4. [API Referansı](https://www.google.com/search?q=%234-api-referans%C4%B1)
+5. [Yasal ve Etik Hususlar](https://www.google.com/search?q=%235-yasal-ve-etik-hususlar)
+6. [Kurulum ve Yapılandırma](https://www.google.com/search?q=%236-kurulum-ve-yap%C4%B1land%C4%B1rma)
+7. [Sistemi Genişletme](https://www.google.com/search?q=%237-sistemi-geni%C5%9Fletme)
+
+---
+
+## **1. Proje Genel Bakış**
+
+**OOCP** (OSINT Operations Control Panel), çeşitli açık kaynak istihbarat araçlarını merkezi bir arayüzden yönetmek, sorguları otomatize etmek ve elde edilen verileri raporlamak için tasarlanmış web tabanlı bir arayüzdür. Sherlock, TheHarvester, Shodan CLI ve Holehe gibi araçların komut satırı karmaşıklığını soyutlayarak yapılandırılmış formlara dönüştürür.
+
+### **Temel Özellikler**
+
+* **Merkezi İstihbarat Paneli:** Kullanıcı adı, e-posta, IP veya domain sorgularını tek bir yerden yönetme.
+* **Standartlaştırılmış Veri Akışı:** Tüm araçlar ortak bir `BaseTool` sınıfından türetilir, bu sayede çıktı formatları (JSON/CSV) standartlaştırılır.
+* **Varlık İlişkilendirme:** Farklı araçlardan gelen verileri (örn: bir e-postadan sosyal medya hesabına) ilişkilendirme altyapısı.
+* **Dosya Tabanlı Arşivleme:** Sorgu sonuçları ("runs") veritabanı gerektirmeden JSON dosyaları olarak saklanır.
+* **AI Destekli Analiz:** Toplanan ham verilerin (örneğin binlerce tweet veya forum gönderisi) duygu analizi ve özetlenmesi için `ai.analyzer` modülü.
+
+---
+
+## **2. Sistem Mimarisi ve Teknik Tasarım**
+
+Uygulama, durumsuz (stateless) bir backend ve dosya sistemi kalıcılığına dayalı standart bir Flask MVC yapısını takip eder.
+
+### **2.1 Mimari Diyagramlar**
+
+#### **İstihbarat Döngüsü (Sequence Diagram)**
+
+Kullanıcı bir hedef (örneğin bir kullanıcı adı) hakkında sorgu başlattığında veri akışı şu şekildedir:
+
+```mermaid
+sequenceDiagram
+    participant User as Frontend (Dashboard)
+    participant API as Flask API
+    participant Tool as Tool Instance (e.g., SherlockTool)
+    participant OS as İşletim Sistemi
+    participant AI as AI Analyzer
+    participant Storage as File Storage
+
+    User->>API: POST /api/sherlock/run (target="jdoe")
+    API->>Tool: validate_input("jdoe")
+    alt Geçersiz Girdi
+        Tool-->>API: Raise ValueError (Hatalı Karakter)
+        API-->>User: 400 Bad Request
+    else Geçerli Girdi
+        Tool->>Tool: build_command()
+        API->>Tool: run()
+        Tool->>OS: subprocess.run(cmd, timeout=600)
+        activate OS
+        OS-->>Tool: stdout (Ham veri), stderr
+        deactivate OS
+
+        Tool->>AI: analyze_entities(stdout)
+        AI-->>Tool: profile_summary (Olası gerçek kişi tespiti)
+
+        Tool->>Storage: save_run(metadata + findings)
+        Storage-->>Tool: run_id
+
+        Tool-->>API: İstihbarat Sonucu
+        API-->>User: 200 OK (JSON)
+    end
+
+```
+
+#### **Sınıf Hiyerarşisi (Class Diagram)**
+
+Sistem, tüm OSINT araçlarını belirli bir yapıya zorlamak için `BaseTool` soyut sınıfını kullanır.
+
+```mermaid
+classDiagram
+    class BaseTool {
+        <<Abstract>>
+        +name: str
+        +category: str (Passive/Active)
+        +validate_input(data) bool*
+        +build_command(data) List[str]*
+        +run(data) Dict
+    }
+
+    class SherlockTool {
+        +description: "Username Search"
+        +validate_input()
+        +build_command()
+    }
+
+    class TheHarvesterTool {
+        +SOURCES: List [google, bing, ...]
+        +validate_input()
+        +build_command()
+    }
+
+    class ShodanTool {
+        +API_KEY: str
+        +validate_input()
+        +build_command()
+    }
+
+    class ExifTool {
+        +SUPPORTED_EXT: List
+        +extract_metadata()
+    }
+
+    BaseTool <|-- SherlockTool
+    BaseTool <|-- TheHarvesterTool
+    BaseTool <|-- ShodanTool
+    BaseTool <|-- HoleheTool
+    BaseTool <|-- ExifTool
+    BaseTool <|-- DNSTwistTool
+
+```
+
+### **2.2 Temel Mantık: base.py**
+
+* **Rate Limiting (Hız Sınırlama):** OSINT araçları genellikle dış servislere (Instagram, LinkedIn vb.) istek attığı için, IP ban yememek adına `BaseTool` içinde otomatik bekleme süreleri (sleep) entegre edilmiştir.
+* **Gizlilik Modu:** `build_command` metodu, mümkün olan araçlarda Tor proxy (`--proxy socks5://...`) kullanımını destekler.
+
+---
+
+## **3. Araç Entegrasyonları**
+
+Her araç `tools/` dizini altında kendi klasöründe bulunur.
+
+### **3.1 Sherlock (SherlockTool)**
+
+* **Amaç:** Kullanıcı adı takibi (Sosyal Medya Hesapları).
+* **Validasyon:** Hedef kullanıcı adının sadece alfanümerik karakterler ve `_`, `.` içerdiğini doğrular.
+* **Özellik:** 400+ sitede tarama yapar. Zaman aşımı süresi yüksektir (Timeout=600s).
+
+### **3.2 TheHarvester (TheHarvesterTool)**
+
+* **Amaç:** E-posta, subdomain ve çalışan isimleri toplama.
+* **Konfigürasyon:** Kullanıcı `sources` parametresi ile arama motorlarını (Google, Bing, DuckDuckGo) seçebilir.
+* **API Yönetimi:** `api_keys.yaml` dosyasından Hunter.io veya SecurityTrails anahtarlarını otomatik çeker.
+
+### **3.3 Shodan CLI (ShodanTool)**
+
+* **Amaç:** Altyapı ve IoT cihaz istihbaratı.
+* **Güvenlik:** Kullanıcının API Key'ini frontend'e asla yansıtmaz.
+* **Filtreler:** `port`, `org`, `country` gibi Shodan filtrelerini yapılandırılmış input olarak alır.
+
+### **3.4 Holehe (HoleheTool)**
+
+* **Amaç:** E-posta adresi üzerinden kayıtlı hesap tespiti (Şifre sıfırlama mekanizmasını kullanır).
+* **Risk Yönetimi:** Çok fazla istekte bulunulmasını engellemek için hedef başına günlük sorgu limiti koyar.
+
+### **3.5 ExifTool (ExifToolWrapper)**
+
+* **Amaç:** Dosya ve görsel metadata analizi (GPS konumu, Cihaz bilgisi).
+* **Girdi:** URL veya yüklenen dosya path'i.
+* **Çıktı:** JSON formatına dönüştürülmüş metadata etiketleri.
+
+### **3.6 DNSTwist (DNSTwistTool)**
+
+* **Amaç:** Phishing (Oltalama) domain tespiti ve Typosquatting analizi.
+* **Çıktı:** Kayıtlı olan benzer domainlerin MX kayıtlarını ve IP adreslerini listeler.
+
+---
+
+## **4. API Referansı**
+
+### **4.1 İstihbarat Topla (Run Scan)**
+
+* **Endpoint:** `POST /api/<tool_name>/run`
+* **Payload:**
+```json
+{
+  "target": "jdoe_99",
+  "options": {
+    "proxy": true,
+    "fast_mode": false
+  }
+}
+
+```
+
+
+* **Response:**
+```json
+{
+  "run_id": "a1b2-c3d4",
+  "status": "completed",
+  "entities": {
+    "urls": ["twitter.com/jdoe_99", "github.com/jdoe_99"],
+    "emails": [],
+    "risk_score": 7.5
+  }
+}
+
+```
+
+
+
+### **4.2 Rapor Oluştur**
+
+* **Endpoint:** `POST /api/report/generate`
+* **İşlem:** Seçilen tarama sonuçlarını (runs) birleştirir ve kişi/kurum bazlı HTML dosya oluşturur.
+* **Format:** `Executive Summary` (Yönetici Özeti) ve `Technical Details` (Teknik Detaylar) olarak ikiye ayrılır.
+
+---
+
+## **5. Yasal ve Etik Hususlar**
+
+OSINT operasyonları, sızma testlerinden farklı olarak "saldırı" içermese de ciddi yasal sınırlar içerir.
+
+### **5.1 Veri Gizliliği (GDPR / KVKK)**
+
+* **Kişisel Veri:** Bu araç halka açık verileri toplasa da, bu verilerin işlenmesi ve saklanması KVKK/GDPR kapsamındadır.
+* **Sorumluluk Reddi:** Sistem, kullanıcıya "Bu verileri yalnızca yasal ve etik sınırlar dahilinde kullanacağımı taahhüt ederim" onayı almadan tarama başlatmaz.
+
+### **5.2 Pasif vs. Aktif Toplama**
+
+* **Pasif:** (Örn: TheHarvester) Hedef sistemle doğrudan etkileşime girmez, arama motorlarını kullanır. Tespit edilmesi zordur.
+* **Aktif:** (Örn: Nmap, Holehe) Hedef sunuculara paket gönderir. Loglarda iz bırakır. OOCP, aktif tarama yapan araçlar için arayüzde **"UYARI: Bu işlem iz bırakır"** etiketi gösterir.
+
+---
+
+## **6. Kurulum ve Yapılandırma**
+
+1. **Gereksinimler:** Python 3.9+, Git, Tor Service (Opsiyonel).
+2. **Kurulum:**
+```bash
+git clone https://github.com/user/oocp.git
+cd oocp
+pip install -r requirements.txt
+
+```
+
+
+3. **API Anahtarları:** `config/api_keys.example.yaml` dosyasını düzenleyin ve Shodan, VirusTotal vb. anahtarlarınızı girin.
+4. **Çalıştırma:** `python app.py`
+
+---
+
+## **7. Sistemi Genişletme**
+
+Yeni bir OSINT aracı (Örn: `Maigret`) eklemek için:
+
+1. `tools/maigret_tool.py` dosyasını oluşturun.
+2. `BaseTool` sınıfını miras alın.
+3. `build_command` fonksiyonunda Maigret'in CLI komutlarını tanımlayın (örn: `maigret <username> --json`).
+4. Çıktıyı OOCP formatına (JSON) parse edecek `parse_output` metodunu yazın.
+5. `app.py` içerisindeki `TOOLS` listesine kaydedin.
