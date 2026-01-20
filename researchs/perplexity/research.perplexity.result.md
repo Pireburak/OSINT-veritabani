@@ -1,1 +1,0 @@
-# Research Result for perplexity
