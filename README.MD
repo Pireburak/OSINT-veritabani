@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-Active-success)
 
-**[Proje Adı]**, açık kaynaklı kaynaklardan bilgi toplamak için geliştirilmiş, Python tabanlı bir OSINT otomasyon aracıdır.
+OSİNT, açık kaynaklı kaynaklardan bilgi toplamak için geliştirilmiş, Python tabanlı bir OSINT otomasyon aracıdır.
 
 > **Uyarı:** Bu araç yalnızca eğitim ve etik güvenlik testleri (ethical hacking) amacıyla geliştirilmiştir.
 
