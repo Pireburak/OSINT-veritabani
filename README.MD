@@ -1,119 +1,85 @@
 # QLineSec
-import whois
-import dns.resolver
-import requests
-import socket
-from colorama import Fore, Style, init
+# [Proje Adı] 🕵️‍♂️
 
-# Renklendirmeyi başlat
-init(autoreset=True)
+![Python Version](https://img.shields.io/badge/python-3.x-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-Active-success)
 
-class OSINTHelper:
-    def __init__(self):
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+**[Proje Adı]**, açık kaynaklı kaynaklardan bilgi toplamak için geliştirilmiş, Python tabanlı bir OSINT otomasyon aracıdır.
 
-    def get_ip_address(self, domain):
-        """Domain'in IP adresini çözer."""
-        try:
-            ip = socket.gethostbyname(domain)
-            print(f"\n{Fore.CYAN}[*] IP Adresi Çözümlendi: {ip}{Style.RESET_ALL}")
-            return ip
-        except Exception as e:
-            print(f"{Fore.RED}[!] IP çözümlenemedi: {e}")
-            return None
+> **Uyarı:** Bu araç yalnızca eğitim ve etik güvenlik testleri (ethical hacking) amacıyla geliştirilmiştir.
 
-    def get_whois_info(self, domain):
-        """Domain kayıt bilgilerini (WHOIS) getirir."""
-        print(f"\n{Fore.YELLOW}[!] {domain} için WHOIS sorgusu yapılıyor...{Style.RESET_ALL}")
-        try:
-            w = whois.whois(domain)
-            print(f"{Fore.GREEN}[+] Kayıt Operatörü: {w.registrar}")
-            print(f"{Fore.GREEN}[+] Oluşturulma Tarihi: {w.creation_date}")
-            print(f"{Fore.GREEN}[+] Bitiş Tarihi: {w.expiration_date}")
-            if w.emails:
-                print(f"{Fore.GREEN}[+] İletişim E-postaları: {w.emails}")
-        except Exception as e:
-            print(f"{Fore.RED}[-] WHOIS bilgisi alınamadı: {e}")
+## 🚀 Özellikler
 
-    def get_dns_records(self, domain):
-        """DNS kayıtlarını (A, MX, NS, TXT) tarar."""
-        print(f"\n{Fore.YELLOW}[!] DNS Kayıtları Taranıyor...{Style.RESET_ALL}")
-        record_types = ['A', 'MX', 'NS', 'TXT']
-        
-        for record in record_types:
-            try:
-                answers = dns.resolver.resolve(domain, record)
-                for rdata in answers:
-                    print(f"{Fore.BLUE}[+] {record} Kaydı: {rdata.to_text()}{Style.RESET_ALL}")
-            except:
-                pass # Kayıt yoksa hata vermeden geç
+* 🔍 **Hızlı Tarama:** [Örn: Hedef kullanıcı adı veya IP hakkında saniyeler içinde veri toplar.]
+* 📊 **Raporlama:** Sonuçları otomatik olarak `.txt` veya `.csv` formatında kaydeder.
+* 🌐 **API Desteği:** [Örn: Shodan, VirusTotal] API'leri ile entegre çalışır.
+* 🛠 **Modüler Yapı:** Kolayca yeni modüller eklenebilir.
 
-    def get_geolocation(self, ip):
-        """IP adresinin coğrafi konumunu bulur (Ücretsiz API kullanarak)."""
-        print(f"\n{Fore.YELLOW}[!] Coğrafi Konum Analizi Yapılıyor...{Style.RESET_ALL}")
-        try:
-            response = requests.get(f"http://ip-api.com/json/{ip}").json()
-            if response['status'] == 'success':
-                print(f"{Fore.MAGENTA}[+] Ülke: {response['country']}")
-                print(f"{Fore.MAGENTA}[+] Şehir: {response['city']}")
-                print(f"{Fore.MAGENTA}[+] ISP: {response['isp']}{Style.RESET_ALL}")
-            else:
-                print(f"{Fore.RED}[-] Konum bulunamadı.")
-        except Exception as e:
-            print(f"{Fore.RED}[-] API hatası: {e}")
+## 📦 Kurulum
 
-    def scan_http_headers(self, domain):
-        """Web sunucusunun HTTP başlıklarını analiz eder (Server, Teknolojiler vb.)."""
-        print(f"\n{Fore.YELLOW}[!] HTTP Başlık Analizi (Web Recon) Başlatıldı...{Style.RESET_ALL}")
-        target_url = f"http://{domain}"
-        try:
-            response = requests.get(target_url, headers=self.headers, timeout=5)
-            headers = response.headers
-            
-            # Kritik başlıkları kontrol et
-            keys_to_check = ['Server', 'X-Powered-By', 'X-AspNet-Version', 'Set-Cookie']
-            
-            for key in keys_to_check:
-                if key in headers:
-                    print(f"{Fore.GREEN}[+] {key}: {headers[key]}{Style.RESET_ALL}")
-                
-        except Exception as e:
-            print(f"{Fore.RED}[-] Web sunucusuna erişilemedi: {e}")
+Projeyi yerel makinenize klonlayın ve gerekli kütüphaneleri yükleyin.
 
-def main():
-    print(f"{Fore.MAGENTA}=== OSINT-Helper-Project v1.0 ==={Style.RESET_ALL}")
-    print(f"{Fore.WHITE}Uyarı: Bu araç sadece eğitim ve yasal analiz amaçlıdır.\n")
-    
-    scanner = OSINTHelper()
-    
-    # Kullanıcıdan hedef domain alınır
-    target_domain = input(f"{Fore.CYAN}Hedef Domain (Örn: google.com): {Style.RESET_ALL}").strip()
-    
-    # "http://" veya "https://" varsa temizle
-    target_domain = target_domain.replace("https://", "").replace("http://", "").split('/')[0]
+```bash
+# Projeyi klonlayın
+git clone [https://github.com/kullaniciadi/proje-adi.git](https://github.com/kullaniciadi/proje-adi.git)
 
-    if target_domain:
-        # 1. IP Çözümleme
-        target_ip = scanner.get_ip_address(target_domain)
-        
-        # 2. WHOIS Sorgusu
-        scanner.get_whois_info(target_domain)
-        
-        # 3. DNS Enum
-        scanner.get_dns_records(target_domain)
-        
-        # 4. GeoIP (Eğer IP çözüldüyse)
-        if target_ip:
-            scanner.get_geolocation(target_ip)
-            
-        # 5. HTTP Header Analizi
-        choice = input(f"\n{Fore.BLUE}Web Sunucu Analizi (HTTP Headers) yapılsın mı? (E/H): {Style.RESET_ALL}")
-        if choice.lower() == 'e':
-            scanner.scan_http_headers(target_domain)
-    else:
-        print("Geçersiz domain girişi.")
+# Proje dizinine gidin
+cd proje-adi
 
-if __name__ == "__main__":
-    main()
+# Gerekli paketleri yükleyin
+pip install -r requirements.txt
+💻 Kullanım
+Aracı çalıştırmak için aşağıdaki komutları kullanabilirsiniz:
+
+Temel Kullanım:
+
+Bash
+python main.py -t [hedef]
+Detaylı Tarama:
+
+Bash
+python main.py --target [hedef_ip_veya_kullanici] --verbose --output rapor.txt
+Parametreler
+
+Parametre	Açıklama
+-t, --target	Hedef IP, domain veya kullanıcı adı.
+-o, --output	Sonuçların kaydedileceği dosya adı.
+-v, --verbose	Detaylı çıktı modunu açar.
+-h, --help	Yardım menüsünü görüntüler.
+⚠️ Yasal Sorumluluk Reddi (Legal Disclaimer)
+Bu yazılım yalnızca eğitim amaçlı ve izinli güvenlik testleri için tasarlanmıştır.
+
+Bu aracın izinsiz sistemlere karşı kullanılması yasa dışıdır.
+
+Geliştirici, bu aracın yanlış kullanımından veya doğurabileceği herhangi bir zarardan sorumlu tutulamaz.
+
+Kullanıcı, bu yazılımı kullanarak tüm yasal sorumlulukları kabul etmiş sayılır.
+
+🤝 Katkıda Bulunma
+Katkılarınızı bekliyoruz! Lütfen önce bir "issue" açarak neyi değiştirmek istediğinizi tartışalım.
+
+Bu repoyu forklayın.
+
+Yeni bir branch oluşturun (git checkout -b ozellik/YeniOzellik).
+
+Değişikliklerinizi commit edin (git commit -m 'Yeni özellik eklendi').
+
+Branch'inizi pushlayın (git push origin ozellik/YeniOzellik).
+
+Bir Pull Request oluşturun.
+
+📝 Lisans
+Bu proje MIT lisansı altında lisanslanmıştır.
+
+
+---
+
+### Bu Şablonu Nasıl Özelleştirebilirsin?
+
+1.  **Teknik Detaylar:** Eğer projen belirli bir API (örneğin Shodan veya Twitter API) kullanıyorsa, "Özellikler" kısmına bunu mutlaka ekle.
+2.  **Ekran Görüntüsü (Screenshot):** Mümkünse aracın çalışır haldeki bir ekran görüntüsünü (terminal çıktısı) `![Demo](resim_linki.png)` formatında en başa eklemek projenin daha çok yıldız (star) almasını sağlar.
+3.  **Requirements:** Projenin çalışması için `requests`, `beautifulsoup4` gibi kütüphaneler gerekiyorsa bunları `requirements.txt` dosyana eklemeyi unutma.
+
+**Senin için yapabileceğim bir sonraki adım:**
+Eğer yazdığın kodun (örneğin `main.py`) içeriğini veya tam olarak ne işlevi yaptığını (örneğin "IP sorgulama" veya "Kullanıcı adı tarama") kısaca yazarsan, "Özellikler" ve "Kullanım" kısımlarını senin projen için **tam nokta atışı** olacak şekilde doldurabilirim. İster misin?
