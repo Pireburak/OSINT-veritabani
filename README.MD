@@ -1,5 +1,5 @@
 # QLineSec
-# [Proje Adı] 🕵️‍♂️
+# OSİNT NEDİR? 🕵️‍♂️
 
 ![Python Version](https://img.shields.io/badge/python-3.x-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
